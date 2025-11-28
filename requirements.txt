@@ -6,3 +6,4 @@ requests
 insightface
 opencv-python-headless
 stripe
+gunicorn
