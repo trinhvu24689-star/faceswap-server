@@ -157,8 +157,6 @@ class CheckoutSessionResponse(BaseModel):
     checkout_url: str
 
 
-# ====== FIREBASE VERIFY BODY ======
-
 class FirebaseVerifyBody(BaseModel):
     id_token: str
 
@@ -177,16 +175,19 @@ async def load_models():
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"Model file not found: {model_path}")
 
+        # ================================
+        # FIX CHẠY TRÊN RENDER (CPU MODE)
+        # ================================
         providers = ["CPUExecutionProvider"]
 
-        print("🔁 Loading FaceAnalysis model...")
+        print("🔁 Loading FaceAnalysis model (CPU)…")
         face_analyser = FaceAnalysis(name="buffalo_l", providers=providers)
-        face_analyser.prepare(ctx_id=0, det_size=(640, 640))
+        face_analyser.prepare(ctx_id=-1, det_size=(640, 640))  # CPU MODE
 
-        print("🔁 Loading FaceSwapper model...")
+        print("🔁 Loading FaceSwapper model (CPU)…")
         face_swapper = get_model(model_path, providers=providers)
 
-        print("✅ AI Models loaded successfully!")
+        print("✅ AI Models loaded successfully (Render CPU Mode)!")
     except Exception as e:
         print(f"❌ Error loading models: {e}")
 
@@ -231,7 +232,7 @@ def add_test_credits(
     return {"credits": user.credits}
 
 
-# ====== PROFILE API ======
+# =================== PROFILE API ===================
 
 @app.get("/profile")
 def get_profile(
@@ -354,7 +355,7 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     return {"received": True}
 
 
-# ====== LỊCH SỬ THANH TOÁN (DÙNG CREDIT_ORDERS) ======
+# =================== PAYMENT HISTORY ===================
 
 @app.get("/payment/history")
 def payment_history(
@@ -382,7 +383,7 @@ def payment_history(
     ]
 
 
-# ====== LOGIN GOOGLE / FACEBOOK (BACKEND OAUTH) ======
+# =================== OAUTH GOOGLE / FACEBOOK ===================
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
@@ -459,7 +460,7 @@ def oauth_facebook_callback(code: str):
         raise HTTPException(status_code=500, detail="Facebook OAuth chưa được cấu hình")
 
     token_url = (
-        "https://graph.facebook.com/v20.0/oauth/access_token"
+        "https://graph.facebook.com/v20.0/oauth_access_token"
         f"?client_id={FACEBOOK_CLIENT_ID}"
         f"&redirect_uri={FACEBOOK_REDIRECT_URI}"
         f"&client_secret={FACEBOOK_CLIENT_SECRET}"
@@ -475,14 +476,10 @@ def oauth_facebook_callback(code: str):
     return {"access_token": access_token}
 
 
-# ====== FIREBASE AUTH VERIFY ======
+# =================== FIREBASE AUTH VERIFY ===================
 
 @app.post("/auth/firebase/verify")
 def firebase_verify(body: FirebaseVerifyBody):
-    """
-    Nhận id_token từ Firebase, gọi Google để verify cơ bản.
-    FE (Firebase) sẽ lo phần login, BE chỉ check token.
-    """
     verify_url = "https://oauth2.googleapis.com/tokeninfo"
     resp = requests.get(verify_url, params={"id_token": body.id_token})
 
@@ -496,7 +493,7 @@ def firebase_verify(body: FirebaseVerifyBody):
     }
 
 
-# =================== FACE SWAP API (trừ điểm) ===================
+# =================== FACE SWAP API ===================
 
 @app.post("/faceswap")
 async def faceswap(
@@ -558,7 +555,6 @@ async def faceswap(
                 status_code=500, detail="Encode result image failed"
             )
 
-        # ===== LƯU ẢNH + LỊCH SỬ SWAP =====
         file_name = f"{uuid.uuid4().hex}.jpg"
         save_path = os.path.join("saved", file_name)
         with open(save_path, "wb") as f:
@@ -571,7 +567,6 @@ async def faceswap(
         )
         db.add(history)
         db.commit()
-        # ================================
 
         io_buffer = io.BytesIO(buffer.tobytes())
         resp = StreamingResponse(io_buffer, media_type="image/jpeg")
@@ -585,7 +580,7 @@ async def faceswap(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ====== LỊCH SỬ ẢNH SWAP API ======
+# =================== LỊCH SỬ ẢNH SWAP API ===================
 
 @app.get("/swap/history")
 def swap_history(
