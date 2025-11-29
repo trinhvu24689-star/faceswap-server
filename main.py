@@ -1,6 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Header, Depends, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, RedirectResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 import stripe
 import insightface
@@ -26,11 +27,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 
-# ====== IMPORT THÊM ======
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
 import requests
-from typing import Optional
+from typing import Optional, List
 
 # =================== FASTAPI APP ===================
 
@@ -66,6 +64,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 CREDIT_COST_PER_SWAP = 10  # mỗi lần swap trừ 10 điểm
+
 
 class User(Base):
     __tablename__ = "users"
@@ -116,6 +115,7 @@ CREDIT_PACKAGES = {
     },
 }
 
+
 class CreditOrder(Base):
     __tablename__ = "credit_orders"
 
@@ -132,6 +132,8 @@ class CreditOrder(Base):
     created_at = Column(DateTime, default=dt.datetime.utcnow)
 
 
+# =================== DB DEPENDENCY ===================
+
 def get_db():
     db = SessionLocal()
     try:
@@ -139,6 +141,8 @@ def get_db():
     finally:
         db.close()
 
+
+# =================== SCHEMAS ===================
 
 class GuestCreateResponse(BaseModel):
     user_id: str
@@ -167,6 +171,7 @@ class FirebaseVerifyBody(BaseModel):
 async def load_models():
     global face_analyser, face_swapper
     try:
+        # tạo bảng DB
         Base.metadata.create_all(bind=engine)
 
         base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -176,7 +181,7 @@ async def load_models():
             raise FileNotFoundError(f"Model file not found: {model_path}")
 
         # ================================
-        # FIX CHẠY TRÊN RENDER (CPU MODE)
+        # CHẠY TRÊN RENDER (CPU MODE)
         # ================================
         providers = ["CPUExecutionProvider"]
 
@@ -515,6 +520,7 @@ async def faceswap(
             detail="Không đủ điểm tín dụng, vui lòng nạp thêm để sử dụng tính năng.",
         )
 
+    # trừ điểm
     user.credits -= CREDIT_COST_PER_SWAP
     db.add(user)
     db.commit()
@@ -601,6 +607,17 @@ def swap_history(
         }
         for r in rows
     ]
+
+
+# =================== GLOBAL ERROR HANDLER (CHO ĐỠ 500 CÂM) ===================
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    print("🔥 Unhandled error:", repr(exc))
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
 
 
 # =================== HEALTHCHECK ===================
