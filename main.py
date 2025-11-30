@@ -103,7 +103,9 @@ else:
     stripe = None
 
 
+# ====== CREDIT PACKAGES (THÊM ĐỦ BACKEND CHO PACKS FRONTEND) ======
 CREDIT_PACKAGES = {
+    # mấy gói cũ (giữ nguyên không đụng tới)
     "pack_50": {
         "name": "Gói 50 điểm",
         "credits": 50,
@@ -118,6 +120,73 @@ CREDIT_PACKAGES = {
         "name": "Gói 1000 điểm",
         "credits": 1000,
         "amount": 750000,
+    },
+
+    # các gói mới khớp với backendId ở frontend
+    "pack_36": {
+        "name": "Gói 36❄️",
+        "credits": 36,
+        "amount": 26000,
+    },
+    "pack_70": {
+        "name": "Gói 70❄️",
+        "credits": 70,
+        "amount": 52000,
+    },
+    "pack_150": {
+        "name": "Gói 150❄️",
+        "credits": 150,
+        "amount": 125000,
+    },
+    "pack_200": {  # giữ id pack_200 vừa cũ vừa mới, amount theo shop
+        "name": "Gói 200❄️",
+        "credits": 200,
+        "amount": 185000,
+    },
+    "pack_400": {
+        "name": "Gói 400❄️",
+        "credits": 400,
+        "amount": 230000,
+    },
+    "pack_550": {
+        "name": "Gói 550❄️",
+        "credits": 550,
+        "amount": 375000,
+    },
+    "pack_750": {
+        "name": "Gói 750❄️",
+        "credits": 750,
+        "amount": 510000,
+    },
+    "pack_999": {
+        "name": "Gói 999❄️",
+        "credits": 999,
+        "amount": 760000,
+    },
+    "pack_1500": {
+        "name": "Gói 1.500❄️",
+        "credits": 1500,
+        "amount": 1050000,
+    },
+    "pack_2600": {
+        "name": "Gói 2.600❄️",
+        "credits": 2600,
+        "amount": 1500000,
+    },
+    "pack_4000": {
+        "name": "Gói 4.000❄️",
+        "credits": 4000,
+        "amount": 2400000,
+    },
+    "pack_7600": {
+        "name": "Gói 7.600❄️",
+        "credits": 7600,
+        "amount": 3600000,
+    },
+    "pack_10000": {
+        "name": "Gói 10.000❄️",
+        "credits": 10000,
+        "amount": 5000000,
     },
 }
 
@@ -241,23 +310,24 @@ def claim_daily_free(
 ):
     today = dt.date.today()
 
-    # lấy user
+    # lấy / tạo user (chỉ dùng field có trong model, không gắn field lạ)
     user = db.get(User, x_user_id)
     if not user:
-        user = User(id=x_user_id, credits=0, free_credits=0, free_last_claim=None)
+        user = User(id=x_user_id, credits=0)
         db.add(user)
         db.commit()
         db.refresh(user)
 
-    # nếu qua ngày → reset free về 0
-    if user.free_last_claim != today:
-        user.free_credits = 0  
-        user.free_last_claim = today  
-        db.add(user)
-        db.commit()
-
-    # kiểm tra đã nhận free hôm nay chưa
-    if user.free_credits > 0:
+    # kiểm tra FreeCreditLog xem hôm nay đã nhận chưa
+    existing = (
+        db.query(FreeCreditLog)
+        .filter(
+            FreeCreditLog.user_id == x_user_id,
+            FreeCreditLog.claimed_date == today,
+        )
+        .first()
+    )
+    if existing:
         raise HTTPException(
             status_code=400,
             detail="Hôm nay bạn đã nhận Bông Tuyết miễn phí rồi, quay lại vào ngày mai nha 💖",
@@ -266,11 +336,17 @@ def claim_daily_free(
     # random số free hôm nay
     added = random.randint(3, 15)
 
-    # free today = added (không cộng dồn hôm trước)
-    user.free_credits = added
-    user.free_last_claim = today
-
+    # cộng credits vào user
+    user.credits += added
     db.add(user)
+
+    # log lại
+    log = FreeCreditLog(
+        user_id=x_user_id,
+        claimed_date=today,
+        amount=added,
+    )
+    db.add(log)
     db.commit()
     db.refresh(user)
 
