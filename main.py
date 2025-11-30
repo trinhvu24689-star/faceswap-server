@@ -12,6 +12,7 @@ from fastapi import (
     Header,
     Depends,
     Request,
+    Form,  # ⬅️ thêm Form để nhận duration_seconds từ FormData
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -89,6 +90,59 @@ class FreeCreditLog(Base):
     claimed_date = Column(Date, index=True, nullable=False)  # ngày nhận free
     amount = Column(Integer, nullable=False)                 # số Bông Tuyết free
     created_at = Column(DateTime, default=dt.datetime.utcnow)
+
+# --------- TÍNH BÔNG TUYẾT THEO THỜI LƯỢNG VIDEO (30s / 15❄️) ---------
+
+VIDEO_CREDITS_PER_30S = 15  # 30s / 15 Bông Tuyết
+
+
+def calculate_video_credits(duration_seconds: int) -> int:
+    """
+    Tính số Bông Tuyết cần trừ theo thời lượng video.
+    - 1–30s  -> 15❄️
+    - 31–60s -> 30❄️
+    - 61–90s -> 45❄️
+    ...
+    """
+    if duration_seconds <= 0:
+        return 0
+    blocks = (duration_seconds + 29) // 30  # làm tròn lên block 30s
+    return blocks * VIDEO_CREDITS_PER_30S
+
+
+def charge_credits_for_video(db: Session, user_id: str, duration_seconds: int):
+    """
+    Trừ Bông Tuyết cho video theo thời lượng.
+    Không đổi text cũ, dùng lại message "Không đủ điểm tín dụng..." nếu thiếu.
+    """
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    cost = calculate_video_credits(duration_seconds)
+
+    # nếu duration <= 0 thì không trừ gì
+    if cost <= 0:
+        return {
+            "credits_charged": 0,
+            "credits_left": user.credits,
+        }
+
+    if user.credits < cost:
+        raise HTTPException(
+            status_code=402,
+            detail="Không đủ điểm tín dụng, vui lòng nạp thêm để sử dụng tính năng.",
+        )
+
+    user.credits -= cost
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    return {
+        "credits_charged": cost,
+        "credits_left": user.credits,
+    }
 
 # =================== STRIPE CONFIG (OPTIONAL) ===================
 
@@ -353,6 +407,27 @@ def claim_daily_free(
     return {
         "added": added,
         "message": f"Hôm nay bạn nhận được {added}❄️ Bông Tuyết miễn phí ✨ (không sử dụng sẽ mất khi sang ngày mới)",
+    }
+
+# ====== API TRỪ BÔNG TUYẾT THEO THỜI LƯỢNG VIDEO ======
+
+@app.post("/credits/video")
+def deduct_video_credits(
+    duration_seconds: int = Form(...),
+    x_user_id: str = Header(..., alias="x-user-id"),
+    db: Session = Depends(get_db),
+):
+    """
+    Endpoint cho web video:
+    - Frontend gửi duration_seconds (giây).
+    - Backend trừ Bông Tuyết theo rule 30s / 15❄️.
+    - Trả về credits_charged + credits_left.
+    """
+    result = charge_credits_for_video(db, x_user_id, duration_seconds)
+    return {
+        "duration_seconds": duration_seconds,
+        "credits_charged": result["credits_charged"],
+        "credits_left": result["credits_left"],
     }
 
 # =================== STRIPE CHECKOUT (nếu có cấu hình) ===================
