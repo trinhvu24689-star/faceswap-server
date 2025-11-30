@@ -2,6 +2,7 @@ import os
 import uuid
 import datetime as dt
 import io
+import random
 
 from fastapi import (
     FastAPI,
@@ -25,6 +26,7 @@ from sqlalchemy import (
     String,
     Integer,
     DateTime,
+    Date,
 )
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 
@@ -78,6 +80,15 @@ class SwapHistory(Base):
     image_path = Column(String)
     created_at = Column(DateTime, default=dt.datetime.utcnow)
 
+
+class FreeCreditLog(Base):
+    __tablename__ = "free_credit_logs"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(String, index=True, nullable=False)
+    claimed_date = Column(Date, index=True, nullable=False)  # ngày nhận free
+    amount = Column(Integer, nullable=False)                 # số Bông Tuyết free
+    created_at = Column(DateTime, default=dt.datetime.utcnow)
 
 # =================== STRIPE CONFIG (OPTIONAL) ===================
 
@@ -222,6 +233,51 @@ def get_profile(
         "created_at": user.created_at.isoformat() if user.created_at else None,
     }
 
+
+@app.post("/credits/free/daily")
+def claim_daily_free(
+    x_user_id: str = Header(..., alias="x-user-id"),
+    db: Session = Depends(get_db),
+):
+    today = dt.date.today()
+
+    # lấy user
+    user = db.get(User, x_user_id)
+    if not user:
+        user = User(id=x_user_id, credits=0, free_credits=0, free_last_claim=None)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    # nếu qua ngày → reset free về 0
+    if user.free_last_claim != today:
+        user.free_credits = 0  
+        user.free_last_claim = today  
+        db.add(user)
+        db.commit()
+
+    # kiểm tra đã nhận free hôm nay chưa
+    if user.free_credits > 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Hôm nay bạn đã nhận Bông Tuyết miễn phí rồi, quay lại vào ngày mai nha 💖",
+        )
+
+    # random số free hôm nay
+    added = random.randint(3, 15)
+
+    # free today = added (không cộng dồn hôm trước)
+    user.free_credits = added
+    user.free_last_claim = today
+
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    return {
+        "added": added,
+        "message": f"Hôm nay bạn nhận được {added}❄️ Bông Tuyết miễn phí ✨ (không sử dụng sẽ mất khi sang ngày mới)",
+    }
 
 # =================== STRIPE CHECKOUT (nếu có cấu hình) ===================
 
