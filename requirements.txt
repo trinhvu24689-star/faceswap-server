@@ -8,3 +8,5 @@ opencv-python-headless
 stripe
 gunicorn
 onnxruntime
+psycopg2-binary
+sqlalchemy
