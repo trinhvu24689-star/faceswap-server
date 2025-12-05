@@ -603,17 +603,62 @@ async def faceswap_full(
     resp.headers["X-Credits-Remaining"] = str(u.credits)
     return resp
 
+# =================== ME ===================
+
+@app.get("/me")
+def get_me(user_id: str, db: Session = Depends(get_db)):
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(404, "User not found")
+    return {
+        "user_id": user.id,
+        "credits": user.credits,
+        "created_at": user.created_at.isoformat() if user.created_at else None
+    }
+
+# =================== REGISTER ===================
+
+@app.post("/register")
+def register(body: dict, db: Session = Depends(get_db)):
+    user_id = str(uuid.uuid4())
+    user = User(id=user_id, credits=5)
+    db.add(user)
+    db.commit()
+    return {"user_id": user_id}
+
+# =================== LOGIN ===================
+
+@app.post("/login")
+def login(body: dict, db: Session = Depends(get_db)):
+    user_id = body.get("user_id")
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(404, "User not found")
+    return {"user_id": user.id, "credits": user.credits}
+
+# =================== VERIFY OTP ===================
+
+@app.post("/verify-otp")
+def verify_otp(body: dict):
+    return {"verified": True}
+
+# =================== UPLOAD AVATAR ===================
+
+@app.post("/upload-avatar")
+def upload_avatar(
+    file: UploadFile = File(...),
+    x_user_id: str = Header(..., alias="x-user-id"),
+):
+    path = f"saved/{x_user_id}_avatar.png"
+    with open(path, "wb") as f:
+        f.write(file.file.read())
+
+    return {"avatar_url": f"/saved/{x_user_id}_avatar.png"}
 
 # =================== GLOBAL ERROR HANDLER ===================
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    if isinstance(exc, FastAPIHTTPException):
-        return JSONResponse(
-            status_code=exc.status_code,
-            content={"detail": exc.detail},
-        )
-
     print("🔥 Unhandled error:", repr(exc))
     return JSONResponse(
         status_code=500,

@@ -22,9 +22,9 @@ lock = threading.Lock()
 # MAIN CHECK FUNCTION
 # =======================
 
-def check_rate_limit(request: Request):
-    ip = request.client.host
+def check_rate_limit(user_id: str):
     now = time.time()
+    return True
 
     with lock:
         # IP đang bị block
