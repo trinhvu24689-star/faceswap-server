@@ -28,8 +28,6 @@ COPY --from=builder /app/.venv .venv/
 # COPY toàn bộ mã nguồn CHÍNH XÁC
 COPY main.py .
 COPY server_state.py .
-COPY auto_cleanup.py .
-COPY auto_wake_core.py .
 COPY db_engine.py .
 COPY rate_limit.py .
 COPY task_queue.py .
@@ -42,7 +40,6 @@ COPY models_extended.py .
 COPY models.py .
 COPY database.py .
 COPY routers/ ./routers/
-COPY video_ai/ ./video_ai/
 
 # ---- COPY models/ đầy đủ (không đổi chữ) ----
 COPY models/ ./models/
