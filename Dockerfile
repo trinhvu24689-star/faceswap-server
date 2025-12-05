@@ -38,6 +38,6 @@ COPY routers/ ./routers/
 RUN mkdir -p saved
 COPY saved/ ./saved/
 
-EXPOSE 8000
+EXPOSE 8080
 
 CMD ["/app/.venv/bin/uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
