@@ -616,9 +616,6 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # =================== ROUTERS + HEALTH ===================
 
-app.include_router(system_router)
-
-
 @app.get("/ping")
 def ping():
     return {"status": "alive"}
