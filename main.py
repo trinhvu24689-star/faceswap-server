@@ -35,7 +35,6 @@ from sqlalchemy.orm import sessionmaker, declarative_base, Session
 
 from db_engine import init_swap_db
 from rate_limit import check_rate_limit
-from routers.system_router import router as system_router
 
 # =================== FASTAPI APP ===================
 
