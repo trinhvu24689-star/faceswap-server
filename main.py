@@ -616,7 +616,6 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # =================== ROUTERS + HEALTH ===================
 
-app.include_router(video_router)
 app.include_router(system_router)
 
 
