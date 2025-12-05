@@ -41,8 +41,6 @@ COPY models.py .
 COPY database.py .
 COPY routers/ ./routers/
 
-# ---- COPY models/ đầy đủ (không đổi chữ) ----
-COPY models/ ./models/
 
 # ---- COPY saved/ nếu tồn tại ----
 RUN mkdir -p saved

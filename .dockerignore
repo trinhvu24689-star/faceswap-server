@@ -1,8 +1,11 @@
-fly.toml
-.git/
+venv/
+models/
+models_extended/
+models/models/
+*.onnx
+*.zip
+*.pyd
 __pycache__/
-.envrc
-.venv/
-
-# Giữ lại file này, KHÔNG được ignore
-!server_state.py
+.git/
+.gitignore
+.env
