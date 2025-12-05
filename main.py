@@ -40,7 +40,9 @@ from auto_cleanup import start_cleanup_thread
 from routers.video_ai import router as video_router
 from auto_wake_core import start_keep_alive, mark_activity
 from routers.system_router import router as system_router
-from insightface.app import FaceAnalysis
+
+# ❌ BỎ DÒNG NÀY (NGUYÊN NHÂN 504)
+# from insightface.app import FaceAnalysis
 
 
 # =================== FASTAPI APP ===================
@@ -60,6 +62,31 @@ if not os.path.exists("saved"):
     os.makedirs("saved", exist_ok=True)
 
 app.mount("/saved", StaticFiles(directory="saved"), name="saved")
+
+
+# ✅ ===================== LAZY LOAD MODEL (DÁN TẠI ĐÂY) =====================
+
+face_analyser = None
+swapper = None
+model_loaded = False
+
+def load_model_once():
+    global face_analyser, swapper, model_loaded
+    if model_loaded:
+        return
+
+    print(">>> LOADING FACE MODEL ...")
+
+    from insightface.app import FaceAnalysis
+    from insightface.model_zoo import get_model
+
+    face_analyser = FaceAnalysis(name="buffalo_l", root="./models")
+    face_analyser.prepare(ctx_id=0)
+
+    swapper = get_model("./models/inswapper_128.onnx", download=False)
+
+    model_loaded = True
+    print(">>> MODEL LOADED SUCCESSFULLY")
 
 
 # =================== DATABASE ===================
