@@ -32,6 +32,7 @@ COPY server_state.py .
 COPY Procfile .
 COPY models.py .
 COPY database.py .
+COPY db_engine.py .
 COPY routers/ ./routers/
 
 # ---- COPY saved/ nếu tồn tại ----
