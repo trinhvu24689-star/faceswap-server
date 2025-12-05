@@ -36,9 +36,6 @@ from sqlalchemy.orm import sessionmaker, declarative_base, Session
 
 from db_engine import SessionLocal as SwapSessionLocal, SwapHistoryModel, init_swap_db
 from rate_limit import check_rate_limit
-from auto_cleanup import start_cleanup_thread
-from routers.video_ai import router as video_router
-from auto_wake_core import start_keep_alive, mark_activity
 from routers.system_router import router as system_router
 
 # ❌ BỎ DÒNG NÀY (NGUYÊN NHÂN 504)
