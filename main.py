@@ -23,7 +23,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse, JSONResponse
 
 from pydantic import BaseModel
-from typing import List
 from sqlalchemy import (
     create_engine,
     Column,
@@ -34,13 +33,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 
-from db_engine import SessionLocal as SwapSessionLocal, SwapHistoryModel, init_swap_db
+from db_engine import init_swap_db
 from rate_limit import check_rate_limit
 from routers.system_router import router as system_router
-
-# ❌ BỎ DÒNG NÀY (NGUYÊN NHÂN 504)
-# from insightface.app import FaceAnalysis
-
 
 # =================== FASTAPI APP ===================
 
@@ -505,72 +500,7 @@ def firebase_verify(body: FirebaseVerifyBody):
         "email": info.get("email"),
     }
 
-
-# =================== FULL AI MODEL (XOÁ LIGHT MODE) ===================
-
-MODEL_ROOT = "./models"
-
-face_app = FaceAnalysis(name="buffalo_l", root=MODEL_ROOT)
-face_app.prepare(ctx_id=0, det_size=(640, 640))
-
-swapper = insightface.model_zoo.get_model("inswapper_128", root=MODEL_ROOT)
-swapper.prepare(ctx_id=0)
-
-print("✅ Full AI FaceSwap Model Loaded!")
-
-
 # =================== FACESWAP APIs ===================
-
-@app.post("/faceswap")
-async def faceswap_light(
-    source_image: UploadFile = File(...),
-    target_image: UploadFile = File(...),
-    x_user_id: str = Header(..., alias="x-user-id"),
-    db: Session = Depends(get_db),
-):
-    if not check_rate_limit(x_user_id):
-        raise HTTPException(
-            429,
-            "Bạn thao tác quá nhanh, vui lòng thử lại sau 😭",
-        )
-
-    u = db.get(User, x_user_id)
-    if not u:
-        raise HTTPException(404, "User not found")
-
-    if u.credits < CREDIT_COST_PER_SWAP:
-        raise HTTPException(
-            402,
-            "Không đủ điểm tín dụng, vui lòng nạp thêm để sử dụng tính năng.",
-        )
-
-    u.credits -= CREDIT_COST_PER_SWAP
-    db.add(u)
-    db.commit()
-    db.refresh(u)
-
-    target_bytes = await target_image.read()
-
-    file_name = f"{uuid.uuid4().hex}.jpg"
-    save_path = os.path.join("saved", file_name)
-    with open(save_path, "wb") as f:
-        f.write(target_bytes)
-
-    history = SwapHistory(
-        id=str(uuid.uuid4()),
-        user_id=u.id,
-        image_path=file_name,
-    )
-    db.add(history)
-    db.commit()
-
-    resp = StreamingResponse(
-        io.BytesIO(target_bytes),
-        media_type=target_image.content_type or "image/jpeg",
-    )
-    resp.headers["X-Credits-Remaining"] = str(u.credits)
-    return resp
-
 
 @app.get("/swap/history")
 def swap_history(
