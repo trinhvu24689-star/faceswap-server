@@ -4,7 +4,6 @@ import datetime as dt
 import io
 import random
 import requests
-import insightface
 import numpy as np
 import cv2
 
@@ -33,7 +32,17 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 
-from db_engine import init_swap_db
+# ===== DB + MODELS (ĐÚNG NHỮNG GÌ BÉ DÙNG) =====
+from db_engine import (
+    init_swap_db,
+    Base,
+    engine,
+    User,
+    CreditOrder,
+    FreeCreditLog,
+)
+
+# ===== RATE LIMIT =====
 from rate_limit import check_rate_limit
 
 # =================== FASTAPI APP ===================
@@ -248,13 +257,10 @@ class FirebaseVerifyBody(BaseModel):
 def on_startup():
     Base.metadata.create_all(bind=engine)
     init_swap_db()
-    start_cleanup_thread()
-    start_keep_alive()
 
 
 @app.middleware("http")
 async def activity_middleware(request: Request, call_next):
-    mark_activity()
     return await call_next(request)
 
 
@@ -342,20 +348,6 @@ def claim_daily_free(
     return {
         "added": added,
         "message": f"Hôm nay bạn nhận được {added}❄️ Bông Tuyết miễn phí ✨ (không sử dụng sẽ mất khi sang ngày mới)",
-    }
-
-
-@app.post("/credits/video")
-def deduct_video_credits(
-    duration_seconds: int = Form(...),
-    x_user_id: str = Header(..., alias="x-user-id"),
-    db: Session = Depends(get_db),
-):
-    r = charge_credits_for_video(db, x_user_id, duration_seconds)
-    return {
-        "duration_seconds": duration_seconds,
-        "credits_charged": r["credits_charged"],
-        "credits_left": r["credits_left"],
     }
 
 
@@ -485,15 +477,24 @@ def payment_history(
 
 @app.post("/auth/firebase/verify")
 def firebase_verify(body: FirebaseVerifyBody):
-    resp = requests.get(
-        "https://oauth2.googleapis.com/tokeninfo",
-        params={"id_token": body.id_token},
-    )
+    try:
+        resp = requests.get(
+            "https://oauth2.googleapis.com/tokeninfo",
+            params={"id_token": body.id_token},
+            timeout=10
+        )
+    except Exception:
+        raise HTTPException(500, "Không kết nối được Firebase")
 
     if resp.status_code != 200:
         raise HTTPException(400, "Invalid Firebase token")
 
     info = resp.json()
+
+    # ✅ CHẶN TOKEN APP KHÁC
+    if info.get("aud") != FIREBASE_CLIENT_ID:
+        raise HTTPException(403, "Sai Firebase App")
+
     return {
         "user_id": info.get("sub"),
         "email": info.get("email"),
@@ -607,12 +608,17 @@ async def faceswap_full(
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
+    if isinstance(exc, FastAPIHTTPException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+        )
+
     print("🔥 Unhandled error:", repr(exc))
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal server error"},
     )
-
 
 # =================== ROUTERS + HEALTH ===================
 
