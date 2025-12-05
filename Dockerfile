@@ -28,15 +28,7 @@ COPY --from=builder /app/.venv .venv/
 # COPY toàn bộ mã nguồn CHÍNH XÁC
 COPY main.py .
 COPY server_state.py .
-COPY db_engine.py .
-COPY rate_limit.py .
-COPY task_queue.py .
 COPY Procfile .
-
-# ---- FIX NHỎ: đúng tên file (services_video_processor.py) ----
-COPY servicesvideo_processor.py ./servicesvideo_processor.py
-
-COPY models_extended.py .
 COPY models.py .
 COPY database.py .
 COPY routers/ ./routers/
