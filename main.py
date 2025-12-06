@@ -1,12 +1,12 @@
 import os
 import uuid
+import time
 import datetime as dt
 import io
 import random
 import requests
 import numpy as np
 import cv2
-import time
 
 from fastapi import (
     FastAPI,
@@ -63,7 +63,7 @@ app = FastAPI(title="FaceSwap AI Backend", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://zenithswap.vercel.app"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
