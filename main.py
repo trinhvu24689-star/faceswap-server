@@ -21,7 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse, JSONResponse
 
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from sqlalchemy import (
     create_engine,
     Column,
@@ -30,6 +30,17 @@ from sqlalchemy import (
     DateTime,
     Date,
 )
+
+
+class RegisterRequest(BaseModel):
+    user_id: str
+    email: EmailStr
+    password: str
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 
 # ===== DB + MODELS (ĐÚNG NHỮNG GÌ BÉ DÙNG) =====
@@ -619,22 +630,36 @@ def get_me(user_id: str, db: Session = Depends(get_db)):
 # =================== REGISTER ===================
 
 @app.post("/register")
-def register(body: dict, db: Session = Depends(get_db)):
-    user_id = str(uuid.uuid4())
-    user = User(id=user_id, credits=5)
-    db.add(user)
-    db.commit()
-    return {"user_id": user_id}
+def register(req: RegisterRequest):
+    user_id = req.user_id
+    email = req.email
+    password = req.password
+
+    # TODO: kiểm tra tồn tại email/user_id trong DB nếu vk có
+    # TODO: hash password nếu vk dùng bcrypt
+
+    return {
+        "status": "ok",
+        "user_id": user_id,
+        "email": email
+    }
 
 # =================== LOGIN ===================
 
 @app.post("/login")
-def login(body: dict, db: Session = Depends(get_db)):
-    user_id = body.get("user_id")
-    user = db.get(User, user_id)
-    if not user:
-        raise HTTPException(404, "User not found")
-    return {"user_id": user.id, "credits": user.credits}
+def login(req: LoginRequest):
+    email = req.email
+    password = req.password
+
+    # TODO: kiểm tra email + password trong DB
+    # Ví dụ giả lập:
+    fake_user_id = "guest-" + str(int(time.time()))
+
+    return {
+        "user_id": fake_user_id,
+        "email": email,
+        "vip": "FREE"
+    }
 
 # =================== VERIFY OTP ===================
 
