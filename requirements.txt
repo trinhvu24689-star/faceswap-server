@@ -10,3 +10,4 @@ gunicorn
 onnxruntime
 psycopg2-binary
 sqlalchemy
+email-validator
